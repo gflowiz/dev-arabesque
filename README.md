@@ -1,25 +1,14 @@
-This repository corresponds to the **second version of arabesque.ifsttar.fr** currently under development.
+Welcome to the second version of Arabesque' - currently under development.
 
-**Project documentation** is also under development, see : [arabesque-doc] https://github.com/gflowiz/arabesque-doc
+**About**  </br>
+Arabesque is a web application for Origin-Destination flow and networks mapping. </br>
+[Go to Arabesque](https://gflowiz.github.io/dev-arabesque/)
 
-A preliminary version remains accessible here : [arabesque](https://github.com/gflowiz/arabesque/blob/master/README.md)
+**Licence** </br>
+Arabesque is under BSD 2-Clause License, Copyright (c) 2024, Univ. Gustave Eiffel. All rights reserved. 
 
-This is a Free and OpenSource project, feel free to help us make it better.
+**Contact** </br>
+[@](mailto:francoise.bahoken@univ-eiffel.fr,etienne.come@univ-eiffel.fr) Françoise BAHOKEN & Étienne CÔME, 
+Univ. Gustave Eiffel (France)
 
-Please report any issue on [GitHub](https://github.com/gflowiz/arabesque).
-
-
-# About Arabesque
-
-Arabesque is a web application for thematic mapping of flow and networks datasets.
-Built in javascript and HTML 5, it provides a full toolset to filter you data
-and simplify it in order to make clearer and understandable maps.
-
-A preliminary detailed documentation is available here: [gflowiz.github.io/arabesque](https://gflowiz.github.io/arabesque/).
-
-The application is under BSD 2-Clause License, Copyright (c) 2019, IFSTTAR.All rights reserved. 
-
-Arabesque is part of *geographic flow vizualisation (gFlowiz)* project
-
-More informations are available on our Research notebook [geoflowiz](https://geoflowiz.hypotheses.org/) dedicated to the exploration, analysis and geovisualization of flows and spatial networks.
-
+![](images/logo_UGEarabesque.png)

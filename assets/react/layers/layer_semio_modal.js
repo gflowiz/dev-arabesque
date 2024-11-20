@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 export const LayerSemioModal = (props) => {
-  console.log(props);
+
   function save_and_close(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -15,7 +15,6 @@ export const LayerSemioModal = (props) => {
       border: border_color,
       opacity: opacity,
     };
-    console.log(config);
 
     //Sending back the style to the view and to the controller
     props.update_geojson(props.layer_name, config);
@@ -82,7 +81,6 @@ export const LayerSemioModal = (props) => {
                 <label class="text-muted h5" for="customRange3">
                   Stroke
                 </label>
-
                 <input
                   type="color"
                   id="layerStrokeColorPickerChange"

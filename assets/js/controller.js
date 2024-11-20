@@ -139,7 +139,7 @@ export default class Controller {
 
         //Delete "" from values (they are already strings)
 
-        console.log(this)
+
         this.model.set_nodes_varnames(id, lat, long);
         this.model
             .import_nodes(nodesfile, this.view.import_links)
@@ -226,9 +226,17 @@ export default class Controller {
     post_import_zip(res, config) {
         //Updating styles
         let nstyle = config.styles.nodes;
-        let lstyle = config.styles.links;
-        this.model.update_nodes_style(nstyle);
 
+        let lstyle = config.styles.links;
+
+        if (!lstyle.stroke) {
+            lstyle.stroke = { color: "grey", size: '0' }
+        }
+        if (!nstyle.stroke) {
+            nstyle.stroke = { color: "grey", size: '0' }
+        }
+        this.model.update_nodes_style(nstyle);
+        this.model.update_links_style(lstyle);
         //Add filters
         this.render_filters(this.render_all.bind(this));
 
@@ -267,13 +275,14 @@ export default class Controller {
             link_data_range
         );
     }
+
     load_thumbnail_zip() {
         const that = this;
         var blob;
         var request = new XMLHttpRequest();
         request.open("GET", "./public/data/mobiscol.zip");
         request.responseType = "blob";
-        request.onload = function () {
+        request.onload = function() {
             blob = request.response;
             var file = new File([blob], "mobiscol.zip");
 
@@ -281,9 +290,15 @@ export default class Controller {
         };
         request.send();
     }
+
     render_all() {
         let proj_sel = document.getElementById("projection");
         let proj = proj_sel.options[proj_sel.selectedIndex].value;
+        //Garder la map à la même position
+        let view = this.view.renderer.map.getView();
+        let center = view.getCenter();
+        let zoom = view.getZoom();
+
 
         this.view.renderer.render(
             this.model.get_nodes(),
@@ -291,7 +306,13 @@ export default class Controller {
             this.model.get_nodes_style(),
             this.model.get_links_style()
         );
+
+        view.setCenter(center);
+        view.setZoom(zoom);
+        //view.setProjection(projection);
     }
+
+
 
     // PROJECTION //
 
@@ -313,13 +334,13 @@ export default class Controller {
         document.getElementById("projection").innerHTML = projs
             .map(
                 (p) =>
-                    "<option id='projection-" +
-                    p +
-                    "' value='" +
-                    p +
-                    "''>" +
-                    global.projections[p].name +
-                    "</option>"
+                "<option id='projection-" +
+                p +
+                "' value='" +
+                p +
+                "''>" +
+                global.projections[p].name +
+                "</option>"
             )
             .join("");
     }
@@ -422,6 +443,7 @@ export default class Controller {
             this.save_geojson_semio.bind(this)
         );
     }
+
     save_geojson_semio(layer_name, new_semio) {
         //updateing the model style
         this.model.config.styles.geojson[layer_name] = new_semio;
@@ -455,12 +477,11 @@ export default class Controller {
             this.toggle_legend
         );
     }
+
     toggle_legend() {
         let legendDiv = document.getElementById("legend");
         let style = getComputedStyle(legendDiv);
-
         let legendButtonDiv = document.getElementById("legendButton");
-
         if (style.display !== "none") {
             legendDiv.style.display = "none";
             legendButtonDiv.style.display = "flex";
@@ -471,7 +492,6 @@ export default class Controller {
     }
 
     // FILTERS //
-
     toggle_new_filter_modal() {
         //We take the first node/link to be able to display properties,
         //as well as filter their types (numeral or string) in the filter modal
@@ -546,7 +566,6 @@ export default class Controller {
         }
     }
     add_filter(target, variable, type) {
-
         this.model.config.filters.target = document.getElementById("filteredLayer").value
         const filter_id = "filter-" + this.model.config.filters.target + "-" + variable + "-" + type;
         const filter_container = document.getElementById(filter_id);
@@ -647,7 +666,7 @@ export default class Controller {
             document.getElementById("Filters").append(filter_div);
             //Fill the div with filter
             this.categorial_filter(target, variable, filter_id, "add");
-
+            console.log(target)
             filter = {
                 target: target,
                 id: variable,
@@ -777,7 +796,7 @@ export default class Controller {
 
             let tempCrossfilter = crossfilter(filtered_data);
 
-            let tempDimension = tempCrossfilter.dimension(function (d) {
+            let tempDimension = tempCrossfilter.dimension(function(d) {
                 return d[chart.variable];
             });
 
@@ -793,30 +812,46 @@ export default class Controller {
         }
     }
     categorial_filter(target, variable, filter_id, mode) {
+        console.log('Target:', target);
+        console.log('Variable:', variable);
+        console.log('Filter ID:', filter_id);
+        console.log('Mode:', mode);
+
         let dimension = this.create_dimension(variable, filter_id);
         let filtering_properties;
+        console.log(this.model.data)
         if (target === "links") {
-            filtering_properties = this.model.data.links.map(
-                (link) => link[variable]
-            );
-        } else if (target === "nodes")
-            filtering_properties = this.model.data.nodes.map(
-                (node) => node.properties.variable
-            );
 
-        ReactDOM.render(<
-            CategorialFilter variable={variable}
-            filtering_properties={filtering_properties}
-            dimension={dimension}
-            render_all={this.render_all.bind(this)}
-            delete_filter={this.delete_filter.bind(this)}
-            mode={mode}
-        />,
+            filtering_properties = this.model.data.links.map((link) => {
+
+                return link[variable];
+            });
+        } else if (target === "nodes") {
+
+            filtering_properties = this.model.data.nodes.map((node) => {
+
+                return node.properties[variable];
+            });
+        }
+
+        console.log(`Filtering Properties for ${target}:`, filtering_properties);
+
+        ReactDOM.render( <
+            CategorialFilter variable = { variable }
+            target = { target }
+            filtering_properties = { filtering_properties }
+            dimension = { dimension }
+            render_all = { this.render_all.bind(this) }
+            delete_filter = { this.delete_filter.bind(this) }
+            mode = { mode }
+            />,
             document.getElementById(filter_id)
         );
     }
 
+
     create_dimension(vname, filter_id) {
+        console.log(vname, filter_id)
         let dim = this.model.data.crossfilters.dimension((l) => l[vname]);
 
         // let range = [
@@ -827,14 +862,14 @@ export default class Controller {
         // dim.filterRange(range);
 
         this.model.data.filters[filter_id] = dim;
-
-        // this.config.filters.push({
-        //   id: vname,
-        //   range: [
-        //     +dim.group().all()[0].key,
-        //     +dim.group().all()[dim.group().all().length - 1].key,
-        //   ],
-        // });
+        console.log(this.model.data.filters)
+            // this.config.filters.push({
+            //   id: vname,
+            //   range: [
+            //     +dim.group().all()[0].key,
+            //     +dim.group().all()[dim.group().all().length - 1].key,
+            //   ],
+            // });
 
         return dim;
     }
@@ -843,26 +878,26 @@ export default class Controller {
 
     addLayer(e) {
         if (e.target.id === "tileLayerButton")
-            ReactDOM.render(<
-                NewTileLayerModal save_layer={this.saveLayer.bind(this)}
-                layers={this.model.config.layers}
-            />,
+            ReactDOM.render( <
+                NewTileLayerModal save_layer = { this.saveLayer.bind(this) }
+                layers = { this.model.config.layers }
+                />,
                 document.getElementById("ModalNewLayer")
             );
         else if (e.target.id === "importLayerbutton")
-            ReactDOM.render(<
-                NewGeojsonLayerModal save_layer={this.saveLayer.bind(this)}
-                layers={this.model.config.layers}
-            />,
+            ReactDOM.render( <
+                NewGeojsonLayerModal save_layer = { this.saveLayer.bind(this) }
+                layers = { this.model.config.layers }
+                />,
                 document.getElementById("ModalNewGeojson")
             );
         else if (e.target.id === "baseLayerButton") {
 
 
-            ReactDOM.render(<
-                NewReferenceLayerModal save_layer={this.saveLayer.bind(this)}
-                layers={this.model.config.layers}
-            />,
+            ReactDOM.render( <
+                NewReferenceLayerModal save_layer = { this.saveLayer.bind(this) }
+                layers = { this.model.config.layers }
+                />,
                 document.getElementById("ModalNewReference")
             );
             document.getElementById('geojsonReferenceModal').setAttribute("style", "display:block")
@@ -952,16 +987,16 @@ export default class Controller {
 
     render_layers_cards() {
         //Display the layers cards
-        ReactDOM.render(<
-            LayerCardsContainer layers={this.model.config.layers}
-            map={this.view.renderer.map}
-            delete_layer={this.delete_layer.bind(this)}
-            change_layer_visibility={this.change_layer_visibility.bind(this)}
-            show_nodes_semio={this.show_nodes_semio.bind(this)}
-            show_links_semio={this.show_links_semio.bind(this)}
-            show_links_shape={this.show_links_shape.bind(this)}
-            show_geojson_semio={this.show_geojson_semio.bind(this)}
-        />,
+        ReactDOM.render( <
+            LayerCardsContainer layers = { this.model.config.layers }
+            map = { this.view.renderer.map }
+            delete_layer = { this.delete_layer.bind(this) }
+            change_layer_visibility = { this.change_layer_visibility.bind(this) }
+            show_nodes_semio = { this.show_nodes_semio.bind(this) }
+            show_links_semio = { this.show_links_semio.bind(this) }
+            show_links_shape = { this.show_links_shape.bind(this) }
+            show_geojson_semio = { this.show_geojson_semio.bind(this) }
+            />,
             document.getElementById("accordionLayerControl")
         );
     }
