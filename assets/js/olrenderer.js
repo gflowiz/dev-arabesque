@@ -5,7 +5,8 @@ import TileLayer from "ol/layer/Tile";
 import { Polygon, Circle, Point } from "ol/geom.js";
 import { Fill, Stroke, Text, Style, RegularShape } from "ol/style.js";
 import CircleStyle from "ol/style/Circle";
-
+import Overlay from 'ol/Overlay';
+import CanvasTitle from "ol-ext/control/CanvasTitle";
 import { TileImage, TileWMS } from 'ol/source';
 import { Tile, Vector as VectorLayer } from "ol/layer.js";
 import { OSM, Vector as VectorSource, XYZ } from "ol/source.js";
@@ -32,14 +33,20 @@ export default class OlRenderer {
 
 
 
+
+        this.customizeMapSource();
+        this.customizeMapAuthor();
+
         this.map = new Map({
             controls: defaultControls().extend([
                 this.exportButton(),
                 new FullScreen(),
                 this.toggleLegendButton(),
                 this.scaleLine(),
+                this.customizeMapTitle(),
                 this.exportPdfButton(),
             ]),
+
             target: "Mapcontainer",
             layers: [],
             renderer: "webgl",
@@ -53,6 +60,14 @@ export default class OlRenderer {
                 constrainOnlyCenter: true,
             }),
         });
+
+        this._popup = new Overlay({
+            element: document.getElementById('popup'),
+            positioning: 'bottom-center',
+            stopEvent: true
+        });
+
+        this.map.addOverlay(this._popup);
 
         // this._extent_size = 10000000;
         this._node_scale_types = { size: "Sqrt", opacity: "Linear" };
@@ -103,6 +118,75 @@ export default class OlRenderer {
         });
         return control;
     }
+    customizeMapTitle() {
+        // CanvasTitle control
+        var titleControl = // CanvasTitle control
+            new CanvasTitle({
+                style: new Style({
+                    text: new Text({
+                        offsetY: 20,
+                        top: 'unset',
+                        bottom: '0',
+                        width: 50,
+                        right: 0,
+                        visibility: 'hidden',
+                        text: '',
+                        font: '30px Arial', // Taille de police 50px
+                    }),
+                })
+            });
+        document.getElementById('titleMap').addEventListener("input", function() {
+            // 
+            global.title = this.value
+            titleControl.setTitle(this.value);
+        });
+
+        return titleControl
+    }
+
+    customizeMapAuthor() {
+
+
+
+        let authorTextSpan;
+        // Écouteur d'événements pour l'élément avec l'ID 'authorMap'
+        document.getElementById('authorMap').addEventListener("input", function() {
+            var author = this.value;
+
+            // Sélectionner le 'span' dans 'sourceDiv'
+            var authorTextSpan = document.getElementById('authorText');
+
+            if (authorTextSpan) {
+                // Ajouter le texte de 'authorMap' au 'span'
+                authorTextSpan.textContent = author;
+            }
+
+        });
+        return authorTextSpan;
+    }
+
+
+    customizeMapSource() {
+
+        let sourceTextSpan;
+        // Écouteur d'événements pour l'élément avec l'ID 'sourceMap'
+        document.getElementById('sourceMap').addEventListener("input", function() {
+            var source = this.value;
+
+            // Sélectionner le 'span' dans 'sourceDiv'
+            var sourceTextSpan = document.getElementById('sourceText');
+
+            if (sourceTextSpan) {
+                // Ajouter le texte de 'sourceMap' au 'span'
+                sourceTextSpan.textContent = source;
+            }
+        });
+
+        return sourceTextSpan;
+    }
+
+
+
     exportButton() {
         //Create export button
         var exportButtonDiv = document.createElement("div");
@@ -121,6 +205,7 @@ export default class OlRenderer {
 
         return legendButtonControl;
     }
+
     exportPdfButton() {
         //Create export button
         var exportButtonDiv = document.createElement("div");
@@ -151,12 +236,19 @@ export default class OlRenderer {
         //Adding a width and height to svg elements so they will be rendered
 
         var svgElements = document.body.querySelectorAll("#legendShapes");
+        var svgElements2 = document.body.querySelectorAll("#sourceDiv");
         svgElements.forEach(function(item) {
             item.setAttribute("width", item.getBoundingClientRect().width);
             item.setAttribute("height", item.getBoundingClientRect().height);
         });
 
+        svgElements2.forEach(function(item) {
+            item.setAttribute("width", item.getBoundingClientRect().width);
+            item.setAttribute("height", item.getBoundingClientRect().height);
+        });
+
         var map_canvas = $(".ol-viewport canvas")[0];
+
         var map_img = map_canvas.toDataURL("image/png");
         const map_div = document.getElementById("Mapcontainer");
         const map_height = parseFloat(
@@ -185,29 +277,53 @@ export default class OlRenderer {
         // TODO Here, we can work on the PDF export 
         doc.addImage(map_img, "PNG", 10, 10, map_final_width, map_final_height);
 
+
+        var attrib = document.getElementById("sourceDiv");
+
+        //Converting legend to canvas and add it to doc
+        html2canvas(attrib, {
+            scrollX: -window.scrollX,
+            scrollY: -window.scrollY,
+            allowTaint: true,
+        }).then((attrib_canvas) => {
+            let attrib_div = attrib_canvas.toDataURL("image/png");
+            let width_attrib = doc_width + margin_right - 10 - attrib.clientWidth
+  
+            doc.addImage(attrib_div, "JPEG", width_attrib, map_final_height + 20);
+            svgElements2.forEach(function(item) {
+                item.removeAttribute("width");
+                item.removeAttribute("height");
+            });
+        });
+
         var legendDiv = document.getElementById("legend");
         let legendButtonDiv = document.getElementById("legendButton");
+
         let style = getComputedStyle(legendDiv);
         if (style.display === "none") {
             legendDiv.style.display = "flex";
             legendButtonDiv.style.display = "none";
         }
 
-        //Converting legend to canvas and add it to doc
-        html2canvas(legend, {
-            scrollX: -window.scrollX,
-            scrollY: -window.scrollY,
-            allowTaint: true,
-        }).then((legend_canvas) => {
-            let legend_img = legend_canvas.toDataURL("image/png");
+        setTimeout(() => {
+            //Converting legend to canvas and add it to doc
+            html2canvas(legend, {
+                scrollX: -window.scrollX,
+                scrollY: -window.scrollY,
+                allowTaint: true,
+            }).then((legend_canvas) => {
+                let legend_img = legend_canvas.toDataURL("image/png");
 
-            doc.addImage(legend_img, "JPEG", 10, map_final_height + 20);
-            doc.save("map.pdf");
-            svgElements.forEach(function(item) {
-                item.removeAttribute("width");
-                item.removeAttribute("height");
+                doc.addImage(legend_img, "JPEG", 10, map_final_height + 20);
+                doc.save("map.pdf");
+                svgElements.forEach(function(item) {
+                    item.removeAttribute("width");
+                    item.removeAttribute("height");
+                });
             });
-        });
+        }, 400)
+
+
     }
 
     // ON ZOOM //
@@ -222,7 +338,9 @@ export default class OlRenderer {
     }
 
     update_links_height(links, lstyle) {
+        
         let resolution_m = this.map.getView().getResolution();
+      
 
         for (let link of links) {
             let height_m = this.linkSize(link, lstyle);
@@ -336,21 +454,30 @@ export default class OlRenderer {
                 opacity = 0;
             }
         }
+   
 
         //COLOR
+        let label = node.id;
+        if (document.getElementById("semioSelectorTextChangenode")) {
+            if (document.getElementById("semioSelectorTextChangenode").value != null) {
+                let selectedLabel = document.getElementById("semioSelectorTextChangenode").value;
+                label = node.properties[selectedLabel]
+            }
+        }
+    
+      
         if (nstyle.color.mode === "fixed") {
             let style = new Style({
                 stroke: new Stroke({
-                    color: "grey",
-                    width: 0,
+                    color: nstyle.stroke.color,
+                    width: nstyle.stroke.size,
                 }),
                 fill: new Fill({
                     color: this.add_opacity_to_color(nstyle.color.fixed, opacity),
                 }),
                 text: new Text({
-                    text: node.properties[nstyle.text.var],
-
-                    font: "12px Calibri,sans-serif",
+                    text: label,
+                    font: 'bold 13px Calibri,sans-serif',
                     fill: new Fill({ color: "#000" }),
                     stroke: new Stroke({
                         color: "#fff",
@@ -371,16 +498,16 @@ export default class OlRenderer {
                 let color_array = nstyle.color.varied.colors;
                 return new Style({
                     stroke: new Stroke({
-                        color: "grey",
-                        width: 0,
+                        color: nstyle.stroke.color,
+                        width: nstyle.stroke.size,
                     }),
                     fill: new Fill({
                         color: this.add_opacity_to_color(color_array[color_index], opacity),
                     }),
                     text: new Text({
-                        text: node.properties[nstyle.text.var],
+                        text: label,
 
-                        font: "12px Calibri,sans-serif",
+                        font: 'bold 13px Calibri,sans-serif',
                         fill: new Fill({ color: "#000" }),
                         stroke: new Stroke({
                             color: "#fff",
@@ -395,8 +522,8 @@ export default class OlRenderer {
                 let node_group = node.properties[this._node_var.color];
                 return new Style({
                     stroke: new Stroke({
-                        color: "grey",
-                        width: 0,
+                        color: nstyle.stroke.color,
+                        width: nstyle.stroke.size,
                     }),
                     fill: new Fill({
                         color: this.add_opacity_to_color(
@@ -405,9 +532,9 @@ export default class OlRenderer {
                         ),
                     }),
                     text: new Text({
-                        text: node.properties[nstyle.text.var],
+                        text: label,
 
-                        font: "12px Calibri,sans-serif",
+                        font: 'bold 13px Calibri,sans-serif',
                         fill: new Fill({ color: "#000" }),
                         stroke: new Stroke({
                             color: "#fff",
@@ -528,6 +655,8 @@ export default class OlRenderer {
     }
 
     add_nodes(nodes, nstyle) {
+       // console.log(nodes)
+
         //On enregistre le max et min pour la définition de l'échelle
         this.nodes_max_value = d3.max(
             nodes.map((n) => n.properties[this._node_var.size])
@@ -588,27 +717,158 @@ export default class OlRenderer {
 
         // création des ronds
         let nodes_vector = new VectorSource({
-            features: proj_nodes.map((co) => {
+            features: proj_nodes.map((co, i) => {
                 let feature = new Feature(new Circle(co.center, co.radius));
                 //We set a style for every feature, because it can be conditional
                 feature.setStyle(this.nodeStyle(co, nstyle));
+                feature.setProperties({
+                    nodeData: nodes[i] // Ajoutez ici toutes les informations supplémentaires nécessaires
+                });
                 return feature;
             }),
         });
 
-        // création de la couche
+
+
+
+        const labelStyle = new Style({
+            text: new Text({
+                font: '13px Calibri,sans-serif',
+                fill: new Fill({
+                    color: '#000',
+                }),
+                stroke: new Stroke({
+                    color: '#fff',
+                    width: 4,
+                }),
+            }),
+        });
+
+        const countryStyle = new Style({
+            fill: new Fill({
+                color: 'rgba(255, 255, 255, 0.6)',
+            }),
+            stroke: new Stroke({
+                color: '#319FD3',
+                width: 1,
+            }),
+        });
+        const style = [countryStyle, labelStyle];
+
+     
+
+        // Création de la couche
         let nodesLayer = new VectorLayer({
             name: "nodes",
             source: nodes_vector,
             renderMode: "image",
-            // style: this.nodeStyle(nstyle),
+            style: (feature) => {
+                const nodeData = feature.get('nodeData'); // Récupération des données supplémentaires
+                const labelText = nodeData.id
+                return new Style({
+                    fill: new Fill({ color: 'rgba(43, 146, 190, 0.4)' }),
+                    stroke: new Stroke({
+                        width: 3,
+                        color: 'rgba(43, 146, 190, 1)',
+                    }),
+                    text: new Text({
+                        font: '13px Calibri,sans-serif',
+                        fill: new Fill({ color: '#fff' }),
+                        stroke: new Stroke({
+                            color: '#000',
+                            width: 2,
+                        }),
+                        text: labelText, // Utilisation du texte dynamique en fonction des données de la feature
+                        overflow: true,
+                    }),
+                });
+            },
         });
-        nodesLayer.setZIndex(0);
-        // ajout de la couche
-        this.map.addLayer(nodesLayer);
 
-        //
+
+        nodesLayer.setZIndex(0);
+
+        this.map.addLayer(nodesLayer);
         this.map.getView().fit(boundingExtent(proj_nodes.map((co) => co.center)));
+
+
+
+        // Ajouter un écouteur d'événement pour le survol
+        this.map.on('pointermove', function(event) {
+            this.getTargetElement().style.cursor = this.hasFeatureAtPixel(event.pixel) ? 'pointer' : '';
+        });
+
+        // Sauvegarder une référence à this avant la fonction de rappel
+        const self = this;
+        // Ajouter un gestionnaire d'événements de clic aux polygones
+        this.map.on('click', function(evt) {
+            self.add_popup_nodes(evt)
+        })
+    }
+    add_popup_nodes(evt) {
+        let popup = this._popup
+            /**
+             * Elements that make up the popup.
+             */
+        const container2 = document.getElementById('popup');
+        const content = document.getElementById('popup-content');
+        const closer = document.getElementById('popup-closer');
+
+
+        // Ajouter un événement de clic pour fermer le popup
+        closer.addEventListener('click', function(event) {
+            event.preventDefault(); // Empêcher le comportement par défaut du lien
+            container2.style.display = 'none'; // Cacher le popup
+        });
+
+        // Déterminer le layer sur lequel le clic s'est produit
+        this.map.forEachFeatureAtPixel(evt.pixel, function(feature, layer) {
+
+            if (layer.get('name') === 'nodes') {
+
+                if (feature) {
+                    // Sélection de l'élément select
+                    var selectElement = document.getElementById("semioSelectorSizeChangenode");
+
+                    // Affichage de la valeur récupérée
+                    if (!selectElement) {
+                        var selectedValue = "indegree"
+                    } else {
+                        // Récupération de la valeur sélectionnée
+                        var selectedValue = selectElement.value;
+                    }
+
+          
+                    // Construire le contenu du popup avec les informations de l'entité
+                    let popupContent = '<h4 class="popup-title" > ID : ' + feature.get('nodeData').id + '</h4>';
+                    popupContent += '<hr>';
+                    popupContent += '<table class="popup-table table table-striped">';
+                    let i = 0;
+                    for (var key in feature.get('nodeData').properties) {
+                        console.log(key, feature.get('nodeData').properties[key])
+                        popupContent += '<tr class="' + (i % 2 == 0 ? '' : 'table-secondary') + '"><td class="popup-key" style="padding: 0.35em;">' + key + '</td><td class="popup-value" style="padding: 0.35em;">' + feature.get('nodeData').properties[key] + '</td></tr>';
+                        i++;
+                    }
+                    popupContent += '</table>';
+
+
+                    // Mettre à jour le contenu du popup
+                    content.innerHTML = popupContent;
+
+                    // Définir la position du popup sur le clic de la souris
+            
+                    popup.setPosition(evt.coordinate);
+
+                    // Afficher le popup
+                    container2.style.display = 'block';
+                } else {
+                    // Si aucun entité n'a été cliqué, cacher le popup
+                    container2.style.display = 'none';
+                }
+            }
+
+        });
+
     }
     update_nodes(nodes, nstyle, z_index) {
         //Update nodes_var with discretization variables
@@ -649,10 +909,13 @@ export default class OlRenderer {
         this.proj_nodes_hash = {};
         proj_nodes.forEach((n) => (this.proj_nodes_hash[n.id] = n));
         let nodes_vector = new VectorSource({
-            features: proj_nodes.map((co) => {
+            features: proj_nodes.map((co, i) => {
                 let circle = new Circle(co.center, co.radius);
 
                 let feature = new Feature(circle);
+                feature.setProperties({
+                    nodeData: nodes[i] // Ajoutez ici toutes les informations supplémentaires nécessaires
+                });
                 feature.setStyle(this.nodeStyle(co, nstyle));
                 return feature;
             }),
@@ -665,6 +928,13 @@ export default class OlRenderer {
         });
         this.map.addLayer(nodesLayer);
         nodesLayer.setZIndex(z_index);
+
+        // Sauvegarder une référence à this avant la fonction de rappel
+        const self = this;
+        // Ajouter un gestionnaire d'événements de clic aux polygones
+        this.map.on('click', function(evt) {
+            self.add_popup_nodes(evt)
+        })
     }
 
     //Update the variables according to which the color, size, text and opacity will vary
@@ -730,7 +1000,7 @@ export default class OlRenderer {
             this._node_scale_types.opacity === "Log"
         ) {
             if (
-                this._node_scale_types.size === "Log" &&
+                this._node_scale_types.size === "Log" ||
                 this._node_scale_types.opacity !== "Log"
             ) {
                 [min_size, max_size] = this.handle_log_scale_size_range(
@@ -740,7 +1010,7 @@ export default class OlRenderer {
                     "#semioNodes"
                 );
             } else if (
-                this._node_scale_types.size !== "Log" &&
+                this._node_scale_types.size !== "Log" ||
                 this._node_scale_types.opacity === "Log"
             ) {
                 [min_opa, max_opa] = this.handle_log_scale_opacity_range(
@@ -749,7 +1019,7 @@ export default class OlRenderer {
                     "#semioNodes"
                 );
             } else if (
-                this._node_scale_types.size === "Log" &&
+                this._node_scale_types.size === "Log" ||
                 this._node_scale_types.opacity === "Log"
             ) {
                 [min_size, max_size] = this.handle_log_scale_size_range(
@@ -824,6 +1094,7 @@ export default class OlRenderer {
     }
 
     linkStyle(link, lstyle) {
+    
         //OPACITY (we need to have rounded numbers)
         let opacity;
         if (lstyle.opacity.mode === "fixed") {
@@ -836,9 +1107,21 @@ export default class OlRenderer {
         }
 
         //COLOR
+        let stroke;
+       // console.log(link)
 
+        if (lstyle.stroke.size != '0') {
+            if (link.key.split('->')[0] != link.key.split('->')[1]) {
+                stroke = new Stroke({
+                    color: lstyle.stroke.color,
+                    width: lstyle.stroke.size,
+                });
+            }
+        }
         if (lstyle.color.mode === "fixed") {
+           // console.log(lstyle)
             return new Style({
+                stroke: stroke,
                 fill: new Fill({
                     color: this.add_opacity_to_color(lstyle.color.fixed, opacity),
                 }),
@@ -852,10 +1135,7 @@ export default class OlRenderer {
                 let color_array = lstyle.color.varied.colors;
 
                 return new Style({
-                    // stroke: new Stroke({
-                    //   color: "grey",
-                    //   width: 0,
-                    // }),
+                     stroke: stroke,
                     fill: new Fill({
                         color: this.add_opacity_to_color(color_array[color_index], opacity),
                     }),
@@ -867,10 +1147,7 @@ export default class OlRenderer {
                 let link_group = link.value;
                 color_array[this._link_color_groups[link_group]];
                 return new Style({
-                    // stroke: new Stroke({
-                    //   color: "grey",
-                    //   width: 0,
-                    // }),
+                     stroke: stroke,
                     fill: new Fill({
                         color: this.add_opacity_to_color(
                             color_array[this._link_color_groups[link_group]],
@@ -885,9 +1162,17 @@ export default class OlRenderer {
         if (lstyle.size.mode === "fixed") {
             return lstyle.size.fixed * (this._extent_size / 1000);
         } else if (lstyle.size.mode === "varied") {
+            if (isNaN(link.value)) {
+                return 0;
+            }
+            if (Number.isNaN(link.value)) {
+                return 0;
+            }
             if (this._link_scale_types.size === "Log")
+              
                 return this._scale_link_size(link.value + 1);
-            else return this._scale_link_size(link.value);
+            else
+                return this._scale_link_size(link.value);
         }
     }
 
@@ -913,8 +1198,15 @@ export default class OlRenderer {
     update_link_scales_types(lstyle) {
             this._link_scale_types.size = lstyle.size.varied.scale;
             this._link_scale_types.opacity = lstyle.opacity.varied.scale;
-        }
+    }
+    
+    update_links_min_max(links) {
+            this.links_min_value = d3.min(links.map((l) => l.value));
+            this.links_max_value = d3.max(links.map((l) => l.value));
+        
+    }
         //Updates scales for sizing elements according to link_var
+        
     update_links_scales(links, lstyle) {
         //COLORS
 
@@ -937,7 +1229,7 @@ export default class OlRenderer {
             this._link_scale_types.opacity === "Log"
         ) {
             if (
-                this._link_scale_types.size === "Log" &&
+                this._link_scale_types.size === "Log" ||
                 this._link_scale_types.opacity !== "Log"
             ) {
                 [min_count_size, max_count_size] = this.handle_log_scale_size_range(
@@ -947,7 +1239,7 @@ export default class OlRenderer {
                     "#semioLinks"
                 );
             } else if (
-                this._link_scale_types.size !== "Log" &&
+                this._link_scale_types.size !== "Log" ||
                 this._link_scale_types.opacity === "Log"
             ) {
                 [min_count_opa, max_count_opa] = this.handle_log_scale_opacity_range(
@@ -956,7 +1248,7 @@ export default class OlRenderer {
                     "#semioLinks"
                 );
             } else if (
-                this._link_scale_types.size === "Log" &&
+                this._link_scale_types.size === "Log" ||
                 this._link_scale_types.opacity === "Log"
             ) {
                 [min_count_size, max_count_size] = this.handle_log_scale_size_range(
@@ -982,12 +1274,14 @@ export default class OlRenderer {
             domain_size = [1, this.links_max_value];
         else domain_size = [this.links_min_value, this.links_max_value];
 
+       
         // definition de l'échelle pour la taille
         this._scale_link_size = this._scales[this._link_scale_types.size]
             .copy()
             .range([0, (this._extent_size / 100) * (this._link_size_ratio / 100)])
             .domain(domain_size);
 
+      
         //Opacité
 
         // definition de l'échelle pour la taille
@@ -1008,6 +1302,7 @@ export default class OlRenderer {
         let orientation = lstyle.shape.orientation;
         let shape_type = lstyle.shape.type;
 
+      
         //Attach link width (in px) for the scalability in the legend
         this.update_links_height(links, lstyle);
 
@@ -1025,138 +1320,58 @@ export default class OlRenderer {
             ratioBounds: 0.9,
         };
 
-        if (orientation === "oriented" && shape_type === "StraightArrow") {
-            let arrows = links.map(function(l) {
-                let from = l.key.split("->")[0];
-                let to = l.key.split("->")[1];
-                let width = this.linkSize(l, lstyle);
-                let arrow = orientedStraightArrow(
-                    style,
-                    nodes_hash[from].center,
-                    nodes_hash[to].center,
-                    nodes_hash[from].radius,
-                    nodes_hash[to].radius,
-                    width
-                );
-                return arrow;
-            }, this);
-            return arrows;
-        } else if (orientation === "noOriented" && shape_type === "StraightArrow") {
-            let arrows = links.map(function(l) {
-                let from = l.key.split("->")[0];
-                let to = l.key.split("->")[1];
-                let width = this.linkSize(l, lstyle);
+        let createArrow = (link, arrowFunction) => {
+            let from = link.key.split("->")[0];
+            let to = link.key.split("->")[1];
+            let width = this.linkSize(link, lstyle);
 
-                let arrow = noOrientedStraightArrow(
-                    nodes_hash[from].center,
-                    nodes_hash[to].center,
-                    nodes_hash[from].radius,
-                    nodes_hash[to].radius,
-                    width
-                );
-                return arrow;
-            }, this);
+            let arrow = arrowFunction(
+                style,
+                nodes_hash[from].center,
+                nodes_hash[to].center,
+                nodes_hash[from].radius,
+                nodes_hash[to].radius,
+                width
+            );
 
-            return arrows;
-        } else if (
-            orientation === "oriented" &&
-            shape_type === "StraightNoHookArrow"
-        ) {
-            let arrows = links.map(function(l) {
-                let from = l.key.split("->")[0];
-                let to = l.key.split("->")[1];
-                let width = this.linkSize(l, lstyle);
-                let arrow = orientedStraightNoHookArrow(
-                    style,
-                    nodes_hash[from].center,
-                    nodes_hash[to].center,
-                    nodes_hash[from].radius,
-                    nodes_hash[to].radius,
-                    width
-                );
-                return arrow;
-            }, this);
-            return arrows;
-        } else if (orientation === "oriented" && shape_type === "TriangleArrow") {
-            let arrows = links.map(function(l) {
-                let from = l.key.split("->")[0];
-                let to = l.key.split("->")[1];
-                let width = this.linkSize(l, lstyle);
-                let arrow = orientedTriangleArrow(
-                    style,
-                    nodes_hash[from].center,
-                    nodes_hash[to].center,
-                    nodes_hash[from].radius,
-                    nodes_hash[to].radius,
-                    width
-                );
-                return arrow;
-            }, this);
-            return arrows;
-        } else if (orientation === "oriented" && shape_type === "CurveArrow") {
-            let arrows = links.map(function(l) {
-                let from = l.key.split("->")[0];
-                let to = l.key.split("->")[1];
-                let width = this.linkSize(l, lstyle);
-                let arrow = orientedCurveArrow(
-                    style,
-                    nodes_hash[from].center,
-                    nodes_hash[to].center,
-                    nodes_hash[from].radius,
-                    nodes_hash[to].radius,
-                    width
-                );
-                return arrow;
-            }, this);
-            return arrows;
-        } else if (orientation === "oriented" && shape_type === "CurveOneArrow") {
-            let arrows = links.map(function(l) {
-                let from = l.key.split("->")[0];
-                let to = l.key.split("->")[1];
-                let width = this.linkSize(l, lstyle);
-                let arrow = orientedCurveOneArrow(
-                    style,
-                    nodes_hash[from].center,
-                    nodes_hash[to].center,
-                    nodes_hash[from].radius,
-                    nodes_hash[to].radius,
-                    width
-                );
-                return arrow;
-            }, this);
-            return arrows;
-        } else if (orientation === "noOriented" && shape_type === "CurveArrow") {
-            let arrows = links.map(function(l) {
-                let from = l.key.split("->")[0];
-                let to = l.key.split("->")[1];
-                let width = this.linkSize(l, lstyle);
-                let arrow = noOrientedCurveArrow(
-                    style,
-                    nodes_hash[from].center,
-                    nodes_hash[to].center,
-                    nodes_hash[from].radius,
-                    nodes_hash[to].radius,
-                    width
-                );
-                return arrow;
-            }, this);
+            return {
+                geometry: arrow,
+                attributes: link
+            };
+        };
 
-            return arrows;
+        let arrows;
+        if (orientation === "oriented" || shape_type === "StraightArrow") {
+            arrows = links.map(link => createArrow(link, orientedStraightArrow));
+        } else if (orientation === "noOriented" || shape_type === "StraightArrow") {
+            arrows = links.map(link => createArrow(link, noOrientedStraightArrow));
+        } else if (orientation === "oriented" || shape_type === "StraightNoHookArrow") {
+            arrows = links.map(link => createArrow(link, orientedStraightNoHookArrow));
+        } else if (orientation === "oriented" || shape_type === "TriangleArrow") {
+            arrows = links.map(link => createArrow(link, orientedTriangleArrow));
+        } else if (orientation === "oriented" || shape_type === "CurveArrow") {
+            arrows = links.map(link => createArrow(link, orientedCurveArrow));
+        } else if (orientation === "oriented" || shape_type === "CurveOneArrow") {
+            arrows = links.map(link => createArrow(link, orientedCurveOneArrow));
+        } else if (orientation === "noOriented" || shape_type === "CurveArrow") {
+            arrows = links.map(link => createArrow(link, noOrientedCurveArrow));
         }
+
+        return arrows;
     }
 
-    add_links(links, lstyle, link_data_range) {
-        //On fixe le minimum et maximum des valeurs pour la définition des échelles
+    add_links(links, lstyle, link_data_range, z_index) {
 
+        //On fixe le minimum et maximum des valeurs pour la définition des échelles
+      
         if (link_data_range !== undefined) {
             this.links_min_value = link_data_range[0];
-            this.links_max_value = link_data_range[1];
+            this.links_max_value = link_data_range[1];    
         } else {
             this.links_min_value = d3.min(links.map((l) => l.value));
             this.links_max_value = d3.max(links.map((l) => l.value));
         }
-
-
+     
         this.update_links_var(lstyle);
         this.update_link_scales_types(lstyle);
         this.update_links_scales(links, lstyle);
@@ -1165,27 +1380,25 @@ export default class OlRenderer {
         if (lstyle.color.varied.type === "qualitative") {
             this.create_link_color_groups(links);
         }
-
         this.map.removeLayer(this.get_layer("links"));
-
-
         let max_90percent = d3.max(links.map((l) => l.value)) * (90 / 100)
         let mean = d3.mean(links.map((l) => l.value))
 
-        let filtered = links.filter(function(a) { return a.value <= max_90percent; });
-
-
-
+        let filtered = links.filter(function (a) { return a.value <= max_90percent; });
+        // Ajouter les informations supplémentaires aux entités géographiques + création des fleches
         let arrows = this.create_arrows(filtered, lstyle);
-
-
-        console.log(links)
-        let links_shapes = arrows.map((a) => {
-            let polygon = new Polygon([a]);
+        let links_shapes = arrows.map((a, i) => {
+          
+            let polygon = new Polygon([a.geometry]);
             let feature = new Feature(polygon);
+            feature.setProperties({
+                linkData: a.attributes // Ajoutez ici toutes les informations supplémentaires nécessaires
+            });
             let link_index = arrows.indexOf(a);
-            let link = filtered[link_index];
+            //recupération des styles
+            let link = arrows[link_index].attributes;
             feature.setStyle(this.linkStyle(link, lstyle));
+           
             return feature;
         }, this);
 
@@ -1198,17 +1411,95 @@ export default class OlRenderer {
             // style: this.linkStyle(lstyle),
             renderMode: "image",
         });
-        linksLayer.setZIndex(-1);
+
+        if (z_index != undefined) {
+            linksLayer.setZIndex(z_index);
+        }
+        else {
+            linksLayer.setZIndex(-1);
+        }
         this.map.addLayer(linksLayer);
+
+
+        // Ajouter un écouteur d'événement pour le survol
+        this.map.on('pointermove', function(event) {
+            this.getTargetElement().style.cursor = this.hasFeatureAtPixel(event.pixel) ? 'pointer' : '';
+        });
+
+        const self = this
+            // Ajouter un gestionnaire d'événements de clic aux polygones
+        this.map.on('click', function(evt) {
+            self.add_popup_links(evt)
+        });
     }
+
+    add_popup_links(evt) {
+
+        let popup = this._popup
+            /**
+             * Elements that make up the popup.
+             */
+        const container = document.getElementById('popup');
+        const content = document.getElementById('popup-content');
+        const closer = document.getElementById('popup-closer');
+
+        // Ajouter un événement de clic pour fermer le popup
+        closer.addEventListener('click', function(event) {
+            event.preventDefault(); // Empêcher le comportement par défaut du lien
+            container.style.display = 'none'; // Cacher le popup
+        });
+
+        // Déterminer le layer sur lequel le clic s'est produit
+        this.map.forEachFeatureAtPixel(evt.pixel, function(feature, layer) {
+            if (layer && layer.get('name') === 'links') {
+                
+                if (feature) {
+                  
+               
+                    // Sélection de l'élément select
+                    var selectElement = document.getElementById("semioSelectorSizeChangeLink");
+                    // Construire le contenu du popup avec les informations de l'entité
+                    let popupContent = '<h4 class="popup-title" > ID : ' + feature.get('linkData').key + '</h4>';
+                    popupContent += '<hr>';
+                    popupContent += '<table class="popup-table table table-striped">';
+                    let i = 0;
+          
+                    for (var key in feature.get('linkData')) {
+                        if (key !== 'key') {
+                            let value = feature.get('linkData')[key];
+                            let formattedValue = isNaN(value) ? value : value.toFixed(2);
+                            popupContent += '<tr class="' + (i % 2 === 0 ? '' : 'table-secondary') + '"><td class="popup-key" style="padding: 0.35em;">' + key + '</td><td class="popup-value" style="padding: 0.35em;">' + formattedValue + '</td></tr>';
+                            i++;
+                        }
+                    }
+                    popupContent += '</table>';
+
+                    // Mettre à jour le contenu du popup
+                    content.innerHTML = popupContent;
+
+                    // Définir la position du popup sur le clic de la souris
+                    popup.setPosition(evt.coordinate);
+              
+                    // Afficher le popup
+                    container.style.display = 'block';
+                } else {
+                    // Si aucun entité n'a été cliqué, cacher le popup
+                    container.style.display = 'none';
+                }
+            }
+        }, {
+            hitTolerance: 5 // Augmenter la tolérance de détection
+        });
+    }
+
 
     update_links(links, lstyle, z_index) {
         //Update the discretization variable
         this.update_links_var(lstyle);
+        this.update_links_min_max(links);
         //Update scale types for size and opacity (linear, pow etc)
         this.update_link_scales_types(lstyle);
         //update the actual scales
-
         this.update_links_scales(links, lstyle);
 
         //Useful for qualitative color grouping
@@ -1217,15 +1508,18 @@ export default class OlRenderer {
         }
 
         this.map.removeLayer(this.get_layer("links"));
-
+        // Ajouter les informations supplémentaires aux entités géographiques + création des fleches
         let arrows = this.create_arrows(links, lstyle);
+        let links_shapes = arrows.map((a, i) => {
 
-        let links_shapes = arrows.map((a) => {
-            let polygon = new Polygon([a]);
+            let polygon = new Polygon([a.geometry]);
             let feature = new Feature(polygon);
             let link_index = arrows.indexOf(a);
-            let link = links[link_index];
+            // Ajouter les informations supplémentaires aux entités géographiques
+
+            let link = arrows[link_index].attributes;
             feature.setStyle(this.linkStyle(link, lstyle));
+
             return feature;
         }, this);
 
@@ -1240,12 +1534,20 @@ export default class OlRenderer {
         });
         this.map.addLayer(linksLayer);
         linksLayer.setZIndex(z_index);
+
+
+
+        const self = this
+            // Ajouter un gestionnaire d'événements de clic aux polygones
+        this.map.on('click', function(evt) {
+            self.add_popup_links(evt)
+        });
     }
+
     set_projection(proj, nodes, links, config, link_data_range) {
         let olproj = getProjection(proj);
-
+  
         const item = global.projections[proj].extent;
-
         olproj.setExtent(item);
 
 
@@ -1265,8 +1567,8 @@ export default class OlRenderer {
         //Selecting every vectorlayers other than nodes and links (so geojson or baselayers)
         for (let vectorLayer of this.map.getLayers().array_.filter((l) => {
                 return (
-                    l instanceof VectorLayer &&
-                    l.values_.name !== "nodes" &&
+                    l instanceof VectorLayer ||
+                    l.values_.name !== "nodes" ||
                     l.values_.name !== "links"
                 );
             })) {
@@ -1286,14 +1588,31 @@ export default class OlRenderer {
 
         let nstyle = config.styles.nodes;
         let lstyle = config.styles.links;
-        this.add_nodes(nodes, nstyle);
-        this.add_links(links, lstyle, link_data_range);
+        let layer_z_indexes = this.get_layer_z_indexes(this.map.getLayers().getArray());
+        this.add_nodes(nodes, nstyle, layer_z_indexes.nodes);
+        this.add_links(links, lstyle, link_data_range, layer_z_indexes.links);
     }
 
-    render(nodes, links, nstyle, lstyle) {
-        this.update_nodes(nodes, nstyle);
-        this.update_links(links, lstyle);
+    render(nodes, links, nstyle, lstyle, link_data_range) {
+       let layer_z_indexes = this.get_layer_z_indexes(this.map.getLayers().getArray());
+        //Envoyer les z-index aux nodes et aux links
+        this.add_nodes(nodes, nstyle, layer_z_indexes.nodes);
+        this.add_links(links, lstyle, link_data_range, layer_z_indexes.links);
     }
+
+
+    get_layer_z_indexes(map_layers) {
+    let layer_z_indexes = {};
+    for (let layer of map_layers) {
+        if (layer instanceof VectorLayer) {
+            let layer_name = layer.values_.name;
+            if (layer_name === "nodes" || layer_name === "links") {
+                layer_z_indexes[layer_name] = layer.getZIndex();
+            }
+        }
+    }
+    return layer_z_indexes;
+}
 
     //LAYERS //
 
@@ -1310,48 +1629,48 @@ export default class OlRenderer {
         let source;
         if (layer.name === "OSM") {
             source = new OSM();
-            // url = "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png";
+            // url = "http://{s}.tile.opentopomap.org/{z}/{x}/{y}.png";
         } else if (layer.name === "Humanitarian_OSM") {
-            url = "https://{a-b}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png";
+            url = "http://{a-b}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
         } else if (layer.name === "Wikimedia") {
-            url = "https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png";
+            url = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
-        } else if (layer.name === "Stamen_without_labels") {
-            url = "https://stamen-tiles-{a-d}.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.png";
+        }  else if (layer.name === "Stamen_without_labels") {
+            url = "http://stamen-tiles-{a-d}.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.png";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
         } else if (layer.name === "Stamen_Light") {
-            url = "https://stamen-tiles-{a-d}.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}.png";
+            url = "http://tiles.stadiamaps.com/tiles/stamen_toner_lite/{z}/{x}/{y}.png?api_key=8bc2069e-6d06-44c0-b43e-4b7de4bbcc3a";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
         } else if (layer.name === "CartoDB Light") {
             url = "http://{1-4}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
         } else if (layer.name === "CartoDB_Voyager_no_label") {
-            url = "https://{1-4}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png";
+            url = "http://{1-4}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
         } else if (layer.name === "CartoDB_Voyager_labeled") {
-            url = "https://{1-4}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}.png";
+            url = "http://{1-4}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}.png";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
-        } else if (layer.name === "Stamen_terrain") {
-            url = "https://stamen-tiles-{a-d}.a.ssl.fastly.net/terrain/{z}/{x}/{y}.png";
+        }  else if (layer.name === "Stamen_terrain") {
+            url = "http://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.png?api_key=8bc2069e-6d06-44c0-b43e-4b7de4bbcc3a";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
-        } else if (layer.name === "Stamen_watercolor") {
-            url = " https: //stamen-tiles-{a-d}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.png";
+        }  else if (layer.name === "Stamen_watercolor") {
+            url = "http://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg?api_key=8bc2069e-6d06-44c0-b43e-4b7de4bbcc3a";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
-        } else if (layer.name === "Stamen_Dark") {
-            url = "https://stamen-tiles-{a-d}.a.ssl.fastly.net/toner/{z}/{x}/{y}.png";
+        } else if (layer.name === "Stadia_Stamen_Dark") {
+            url = "http://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}.png?api_key=8bc2069e-6d06-44c0-b43e-4b7de4bbcc3a";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
         } else if (layer.name === "ESRI_World_Street_map") {
-            url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}";
+            url = "http://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
         } else if (layer.name === "ESRI_World_Topo_map") {
-            url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}";
+            url = "http://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
         } else if (layer.name === "ESRI_World_Imagery") {
-            url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+            url = "http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
         } else if (layer.name === "ESRI_NatGeo_World") {
-            url = "https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}";
+            url = "http://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}";
             source = new XYZ({ url: url, crossOrigin: "Anonymous" });
         }
 
@@ -1369,8 +1688,6 @@ export default class OlRenderer {
             name: layer.name,
             source: source,
         });
-
-
         tileLayer.setZIndex(layer.z_index);
         this.map.addLayer(tileLayer);
     }
@@ -1482,7 +1799,6 @@ export default class OlRenderer {
 
     render_layers(layers, styles) {
 
-
         for (let layer of layers) {
             //Skip the iteration if it's nodes or links (they are added in add_nodes and add_links functions)
             if (layer.name !== "nodes" || layer.name !== "links") {
@@ -1508,8 +1824,9 @@ export default class OlRenderer {
         for (let l of layers) {
             z_indexes[l.name] = l.z_index;
         }
-
+   
         for (let layer of this.map.getLayers().array_) {
+            
             layer.setZIndex(z_indexes[layer.values_.name]);
         }
     }
