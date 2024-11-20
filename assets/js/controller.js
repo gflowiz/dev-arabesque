@@ -280,11 +280,11 @@ export default class Controller {
         const that = this;
         var blob;
         var request = new XMLHttpRequest();
-        request.open("GET", "./public/data/mobiscol.zip");
+        request.open("GET", "./public/data/France_mobilite_scolaires.zip");
         request.responseType = "blob";
         request.onload = function() {
             blob = request.response;
-            var file = new File([blob], "mobiscol.zip");
+            var file = new File([blob], "France_mobilite_scolaires.zip");
 
             that.import_zip(null, file);
         };
